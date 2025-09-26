@@ -1,0 +1,74 @@
+version: 2016-11-18
+stack:
+  name: VidyacloneServiceStack
+  ec2MetadataURI: configuration/rde_ec2_metadata.yaml
+  # Please see the following guide on how to configure credentials: https://builderhub.corp.amazon.com/docs/rde/user-guide/howto.html#use-aws-credentials-on-macos
+  # You can use RDE placeholders https://builderhub.corp.amazon.com/docs/rde/user-guide/placeholders.html to customize account settings
+  # and the rest of the definition file.
+
+  
+
+  
+  # devAccount:
+  #   type: Isengard
+  #   roleArn: arn:aws:iam::190660906344:role/REPLACE_WITH_YOUR_ROLE_NAME
+  
+
+  applications:
+    VidyacloneService:
+
+      type: brazil/codedeploy
+
+      codeURI: ../../
+      packages:
+        VidyacloneService:
+          buildTarget: release
+
+          isVersionSetTarget: true
+
+        VidyacloneServiceCodeDeployTransform:
+          buildTarget: release
+          isBatsParameter: true
+      mountPoints:
+
+      - sourceURI: mounts/000RemoveELBScripts
+        destinationURI: ApolloCmd/PreactivateAdmin/000RemoveFailingScripts
+
+      networkMappings:
+      - name: my.service.endpoint.com
+        internalPort: 8080
+
+        externalPort: 80
+        exposedPort: 1080
+
+        protocol: http
+
+    HydraTestApp:
+      type: hydra
+      codeURI: ../../
+      runDefinitionURI: mounts/hydra/runDefinition.json
+      packages:
+        VidyacloneServiceTests:
+          buildTarget: release
+          isApplicationTarget: true
+
+
+
+steps:
+  build:
+    type: build
+    arguments:
+      container: true
+  deploy:
+    type: deploy
+  run-hydra-tests:
+    type: stackExec
+    arguments:
+      applications:
+        - HydraTestApp
+      command: run-hydra-tests
+workflows:
+  default:
+  - build
+  - deploy
+
