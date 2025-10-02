@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# Service stop script for CodeDeploy ApplicationStop hook
+# This script runs as ec2-user to stop the VidyacloneService
+
+set -e
+
+echo "Stopping VidyacloneService..."
+
+SERVICE_HOME=/opt/VidyacloneService
+PID_FILE=$SERVICE_HOME/service.pid
+
+# Check if PID file exists
+if [ -f "$PID_FILE" ]; then
+    PID=$(cat $PID_FILE)
+    echo "Found PID file with PID: $PID"
+    
+    # Check if process is running
+    if ps -p $PID > /dev/null; then
+        echo "Stopping process with PID: $PID"
+        kill $PID
+        
+        # Wait for graceful shutdown
+        for i in {1..30}; do
+            if ! ps -p $PID > /dev/null; then
+                echo "Process stopped gracefully"
+                break
+            fi
+            echo "Waiting for process to stop... ($i/30)"
+            sleep 1
+        done
+        
+        # Force kill if still running
+        if ps -p $PID > /dev/null; then
+            echo "Force killing process..."
+            kill -9 $PID
+            sleep 2
+        fi
+    else
+        echo "Process with PID $PID is not running"
+    fi
+    
+    # Remove PID file
+    rm -f $PID_FILE
+else
+    echo "No PID file found, checking for running processes..."
+fi
+
+# Kill any remaining VidyacloneService processes
+if pgrep -f "VidyacloneService" > /dev/null; then
+    echo "Killing remaining VidyacloneService processes..."
+    pkill -f "VidyacloneService" || true
+    sleep 2
+fi
+
+# Verify no processes are running
+if pgrep -f "VidyacloneService" > /dev/null; then
+    echo "Warning: Some VidyacloneService processes may still be running"
+    pgrep -f "VidyacloneService" || true
+else
+    echo "All VidyacloneService processes stopped successfully"
+fi
+
+echo "Service stop completed."

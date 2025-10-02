@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Service start script for CodeDeploy ApplicationStart hook
+# This script runs as ec2-user to start the VidyacloneService
+
+set -e
+
+echo "Starting VidyacloneService..."
+
+# Set up environment variables
+export JAVA_HOME=/usr/lib/jvm/java-11-amazon-corretto
+export PATH=$JAVA_HOME/bin:$PATH
+export SERVICE_HOME=/opt/VidyacloneService
+export LOG_DIR=/var/log/VidyacloneService
+
+# Change to service directory
+cd $SERVICE_HOME
+
+# Set up Java classpath
+CLASSPATH="$SERVICE_HOME/lib/*:$SERVICE_HOME/conf"
+
+# JVM options
+JVM_OPTS="-Xmx1024m -Xms512m"
+JVM_OPTS="$JVM_OPTS -Djava.awt.headless=true"
+JVM_OPTS="$JVM_OPTS -Dlog4j.configurationFile=$SERVICE_HOME/conf/log4j2.xml"
+JVM_OPTS="$JVM_OPTS -Dservice.home=$SERVICE_HOME"
+JVM_OPTS="$JVM_OPTS -Dlog.dir=$LOG_DIR"
+
+# Start the service in background
+echo "Starting Java application..."
+nohup java $JVM_OPTS -cp "$CLASSPATH" com.amazon.vidyacloneservice.VidyacloneService > $LOG_DIR/service.log 2>&1 &
+
+# Save PID
+echo $! > $SERVICE_HOME/service.pid
+
+# Wait a moment for service to start
+sleep 5
+
+# Check if service is running
+if [ -f "$SERVICE_HOME/service.pid" ]; then
+    PID=$(cat $SERVICE_HOME/service.pid)
+    if ps -p $PID > /dev/null; then
+        echo "VidyacloneService started successfully with PID: $PID"
+    else
+        echo "Failed to start VidyacloneService"
+        exit 1
+    fi
+else
+    echo "Failed to create PID file"
+    exit 1
+fi
+
+echo "Service startup completed."

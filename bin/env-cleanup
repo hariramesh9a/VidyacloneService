@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Environment cleanup script for CodeDeploy BeforeInstall hook
+# This script runs as root to clean up any previous deployment artifacts
+
+set -e
+
+echo "Starting environment cleanup..."
+
+# Stop any running services
+if pgrep -f "VidyacloneService" > /dev/null; then
+    echo "Stopping existing VidyacloneService processes..."
+    pkill -f "VidyacloneService" || true
+fi
+
+# Clean up previous deployment directory
+if [ -d "/opt/VidyacloneService" ]; then
+    echo "Removing previous deployment directory..."
+    rm -rf /opt/VidyacloneService
+fi
+
+# Create deployment directory with proper permissions
+echo "Creating deployment directory..."
+mkdir -p /opt/VidyacloneService
+chown ec2-user:ec2-user /opt/VidyacloneService
+
+# Clean up any temporary files
+echo "Cleaning up temporary files..."
+rm -rf /tmp/VidyacloneService-* || true
+
+# Create log directory
+mkdir -p /var/log/VidyacloneService
+chown ec2-user:ec2-user /var/log/VidyacloneService
+
+echo "Environment cleanup completed successfully."

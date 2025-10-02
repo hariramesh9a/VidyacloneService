@@ -1,0 +1,22 @@
+version: 0.0
+os: linux
+files:
+  - source: /
+    destination: /opt/VidyacloneService
+hooks:
+  BeforeInstall:
+    - location: bin/env-cleanup
+      timeout: 300
+      runas: root
+  ApplicationStart:
+    - location: bin/start-service
+      timeout: 300
+      runas: ec2-user
+  ApplicationStop:
+    - location: bin/stop-service
+      timeout: 300
+      runas: ec2-user
+  ValidateService:
+    - location: bin/validate-service
+      timeout: 300
+      runas: ec2-user

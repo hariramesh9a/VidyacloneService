@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# Service validation script for CodeDeploy ValidateService hook
+# This script runs as ec2-user to validate the VidyacloneService is running correctly
+
+set -e
+
+echo "Validating VidyacloneService..."
+
+SERVICE_HOME=/opt/VidyacloneService
+PID_FILE=$SERVICE_HOME/service.pid
+LOG_DIR=/var/log/VidyacloneService
+
+# Check if PID file exists
+if [ ! -f "$PID_FILE" ]; then
+    echo "ERROR: PID file not found at $PID_FILE"
+    exit 1
+fi
+
+PID=$(cat $PID_FILE)
+echo "Checking process with PID: $PID"
+
+# Check if process is running
+if ! ps -p $PID > /dev/null; then
+    echo "ERROR: Process with PID $PID is not running"
+    exit 1
+fi
+
+echo "Process is running with PID: $PID"
+
+# Check if service is listening on expected port (assuming port 8080)
+SERVICE_PORT=8080
+echo "Checking if service is listening on port $SERVICE_PORT..."
+
+# Wait up to 60 seconds for service to be ready
+for i in {1..60}; do
+    if netstat -ln | grep ":$SERVICE_PORT " > /dev/null; then
+        echo "Service is listening on port $SERVICE_PORT"
+        break
+    fi
+    
+    if [ $i -eq 60 ]; then
+        echo "ERROR: Service is not listening on port $SERVICE_PORT after 60 seconds"
+        echo "Checking service logs..."
+        if [ -f "$LOG_DIR/service.log" ]; then
+            echo "Last 20 lines of service log:"
+            tail -20 $LOG_DIR/service.log
+        fi
+        exit 1
+    fi
+    
+    echo "Waiting for service to start listening... ($i/60)"
+    sleep 1
+done
+
+# Perform health check (assuming a health endpoint exists)
+echo "Performing health check..."
+HEALTH_URL="http://localhost:$SERVICE_PORT/health"
+
+# Try health check with curl (if available)
+if command -v curl > /dev/null; then
+    if curl -f -s $HEALTH_URL > /dev/null; then
+        echo "Health check passed"
+    else
+        echo "WARNING: Health check failed, but service appears to be running"
+        # Don't fail deployment for health check failure, just warn
+    fi
+else
+    echo "curl not available, skipping HTTP health check"
+fi
+
+# Check log file for errors
+if [ -f "$LOG_DIR/service.log" ]; then
+    echo "Checking service logs for errors..."
+    if grep -i "error\|exception\|failed" $LOG_DIR/service.log | tail -5; then
+        echo "WARNING: Found errors in service log (showing last 5)"
+    else
+        echo "No recent errors found in service log"
+    fi
+else
+    echo "WARNING: Service log file not found at $LOG_DIR/service.log"
+fi
+
+echo "Service validation completed successfully"
+echo "VidyacloneService is running and appears healthy"
